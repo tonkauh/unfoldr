@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { Skin } from '../data/skins';
 
 interface EnvelopePageProps {
@@ -40,7 +40,7 @@ export function EnvelopePage({
     }, 800);
   };
 
-  const containerVariants = {
+  const containerVariants: Variants = {
     closed: { rotate: -3, scale: 0.85, width: 280, height: 280 },
     untying: { rotate: -3, scale: 0.85, width: 280, height: 280 },
     unfolding: { 
@@ -48,7 +48,7 @@ export function EnvelopePage({
       scale: 1, 
       width: 360, 
       height: 520,
-      transition: { type: "spring", stiffness: 50, damping: 15 }
+      transition: { type: "spring" as const, stiffness: 50, damping: 15 }
     },
     opened: { rotate: 0, scale: 1, width: 360, height: 520 }
   };
