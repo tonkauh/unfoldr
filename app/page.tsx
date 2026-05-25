@@ -44,39 +44,61 @@ export default function BirthdayCard() {
     if (typeof window === 'undefined') return;
 
     const loadDataFromUrl = () => {
+      console.log('Checking URL for shared data...');
+      
       const getShareData = () => {
-        const searchParams = new URLSearchParams(window.location.search);
-        const searchData = searchParams.get('c');
-        if (searchData) return searchData;
+        const href = window.location.href;
         
-        const hash = window.location.hash.substring(1);
-        if (hash.startsWith('c=')) return hash.substring(2);
+        // 1. Try regex on the whole URL (most robust)
+        const match = href.match(/[?&#]c=([^&#]*)/);
+        if (match && match[1]) {
+          return decodeURIComponent(match[1]);
+        }
         return null;
       };
 
       const data = getShareData();
       
       if (data) {
+        console.log('Shared data found, length:', data.length);
         try {
-          const decompressed = LZString.decompressFromEncodedURIComponent(data);
+          // Decompress from either encoded URI component or direct string
+          const decompressed = LZString.decompressFromEncodedURIComponent(data) 
+            || LZString.decompress(data);
+
           if (decompressed) {
             const parsed = JSON.parse(decompressed);
-            setFrontText(parsed.f || "Happy Birthday!");
-            setSurpriseText(parsed.s || "You are Loved!");
-            setCards(parsed.c || []);
-            setSelectedSkinId(parsed.sk || 'classic');
-            setIsShared(true);
-            setIsFinished(false);
-            setAppState('preview');
+            console.log('Data successfully decompressed and parsed.');
+            
+            // Batch updates in a timeout to ensure they happen after hydration
+            setTimeout(() => {
+              setFrontText(parsed.f || "Happy Birthday!");
+              setSurpriseText(parsed.s || "You are Loved!");
+              setCards(parsed.c || []);
+              setSelectedSkinId(parsed.sk || 'classic');
+              setIsShared(true);
+              setIsFinished(false);
+              setAppState('preview');
+              setIsLoading(false);
+            }, 50);
+          } else {
+            console.error('Decompression failed. Data might be truncated or improperly encoded.');
+            setIsLoading(false);
           }
         } catch (err) {
-          console.error('Error loading shared card:', err);
+          console.error('Error processing shared data:', err);
+          setIsLoading(false);
         }
+      } else {
+        console.log('No shared data found in URL.');
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
+    // Initial check
     loadDataFromUrl();
+    
+    // Listen for manual hash changes
     window.addEventListener('hashchange', loadDataFromUrl);
     return () => window.removeEventListener('hashchange', loadDataFromUrl);
   }, []);

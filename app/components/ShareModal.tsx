@@ -62,7 +62,7 @@ export function ShareModal({ isOpen, onClose, shareUrl, onPreview }: ShareModalP
                   </button>
                 </div>
                 <p className="text-[10px] text-red-500/70 italic leading-tight">
-                  ⚠️ Important: If you added large high-res photos, the link might be too long for some apps (like LINE or Messenger). Try using smaller images if the link doesn't open.
+                  ⚠️ Important: If you added large high-res photos, the link might be too long for some apps (like LINE or Messenger). Try using smaller images if the link doesn&apos;t open.
                 </p>
               </div>
 
