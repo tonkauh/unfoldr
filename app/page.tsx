@@ -40,24 +40,37 @@ export default function BirthdayCard() {
 
   // URL Deserialization on mount
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const data = params.get('c');
+    if (typeof window === 'undefined') return;
+
+    const getShareData = () => {
+      const searchParams = new URLSearchParams(window.location.search);
+      const searchData = searchParams.get('c');
+      if (searchData) return searchData;
+      
+      const hash = window.location.hash.substring(1);
+      if (hash.startsWith('c=')) return hash.substring(2);
+      return null;
+    };
+
+    const data = getShareData();
+    
     if (data) {
+      console.log('Shared card data detected, parsing...');
       try {
         const decompressed = LZString.decompressFromEncodedURIComponent(data);
         if (decompressed) {
           const parsed = JSON.parse(decompressed);
-          setTimeout(() => {
-            setFrontText(parsed.f);
-            setSurpriseText(parsed.s);
-            setCards(parsed.c);
-            setSelectedSkinId(parsed.sk || 'classic');
-            setIsShared(true);
-            setAppState('preview');
-          }, 0);
+          setFrontText(parsed.f || "I love you, Happy Birthday!");
+          setSurpriseText(parsed.s || "You are Loved! ❤️");
+          setCards(parsed.c || []);
+          setSelectedSkinId(parsed.sk || 'classic');
+          setIsShared(true);
+          setAppState('preview');
+        } else {
+          console.error('Failed to decompress card data. The link may be incomplete.');
         }
       } catch (err) {
-        console.error('Failed to parse shared card data:', err);
+        console.error('Error loading shared card:', err);
       }
     }
   }, []);
@@ -84,7 +97,8 @@ export default function BirthdayCard() {
       sk: selectedSkinId
     };
     const serialized = LZString.compressToEncodedURIComponent(JSON.stringify(data));
-    const url = `${window.location.origin}${window.location.pathname}?c=${serialized}`;
+    // Use hash instead of search for larger data support
+    const url = `${window.location.origin}${window.location.pathname}#c=${serialized}`;
     setShareUrl(url);
     setIsShareModalOpen(true);
   };
