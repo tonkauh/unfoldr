@@ -16,11 +16,18 @@ type AppState = 'editor' | 'preview';
 
 export default function BirthdayCard() {
   const [appState, setAppState] = useState<AppState>('editor');
+  const [isLoading, setIsLoading] = useState(true);
   const [isFinished, setIsFinished] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
   const [isShared, setIsShared] = useState(false);
   
+  // Customization State
+  const [frontText, setFrontText] = useState("I love you, Happy Birthday!");
+  const [surpriseText, setSurpriseText] = useState("You are Loved! ❤️");
+  const [cards, setCards] = useState<Card[]>([CARDS[0]]);
+  const [selectedSkinId, setSelectedSkinId] = useState('classic');
+
   // Monetization State
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [unlockedSkins, setUnlockedSkins] = useState<string[]>([]);
@@ -30,49 +37,48 @@ export default function BirthdayCard() {
     skin?: Skin;
   }>({ isOpen: false, type: 'SUBSCRIPTION' });
 
-  // Customization State
-  const [frontText, setFrontText] = useState("I love you, Happy Birthday!");
-  const [surpriseText, setSurpriseText] = useState("You are Loved! ❤️");
-  const [cards, setCards] = useState<Card[]>([CARDS[0]]);
-  const [selectedSkinId, setSelectedSkinId] = useState('classic');
-
   const activeSkin = SKINS.find(s => s.id === selectedSkinId) || SKINS[0];
 
-  // URL Deserialization on mount
+  // URL Deserialization logic
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const getShareData = () => {
-      const searchParams = new URLSearchParams(window.location.search);
-      const searchData = searchParams.get('c');
-      if (searchData) return searchData;
+    const loadDataFromUrl = () => {
+      const getShareData = () => {
+        const searchParams = new URLSearchParams(window.location.search);
+        const searchData = searchParams.get('c');
+        if (searchData) return searchData;
+        
+        const hash = window.location.hash.substring(1);
+        if (hash.startsWith('c=')) return hash.substring(2);
+        return null;
+      };
+
+      const data = getShareData();
       
-      const hash = window.location.hash.substring(1);
-      if (hash.startsWith('c=')) return hash.substring(2);
-      return null;
+      if (data) {
+        try {
+          const decompressed = LZString.decompressFromEncodedURIComponent(data);
+          if (decompressed) {
+            const parsed = JSON.parse(decompressed);
+            setFrontText(parsed.f || "Happy Birthday!");
+            setSurpriseText(parsed.s || "You are Loved!");
+            setCards(parsed.c || []);
+            setSelectedSkinId(parsed.sk || 'classic');
+            setIsShared(true);
+            setIsFinished(false);
+            setAppState('preview');
+          }
+        } catch (err) {
+          console.error('Error loading shared card:', err);
+        }
+      }
+      setIsLoading(false);
     };
 
-    const data = getShareData();
-    
-    if (data) {
-      console.log('Shared card data detected, parsing...');
-      try {
-        const decompressed = LZString.decompressFromEncodedURIComponent(data);
-        if (decompressed) {
-          const parsed = JSON.parse(decompressed);
-          setFrontText(parsed.f || "I love you, Happy Birthday!");
-          setSurpriseText(parsed.s || "You are Loved! ❤️");
-          setCards(parsed.c || []);
-          setSelectedSkinId(parsed.sk || 'classic');
-          setIsShared(true);
-          setAppState('preview');
-        } else {
-          console.error('Failed to decompress card data. The link may be incomplete.');
-        }
-      } catch (err) {
-        console.error('Error loading shared card:', err);
-      }
-    }
+    loadDataFromUrl();
+    window.addEventListener('hashchange', loadDataFromUrl);
+    return () => window.removeEventListener('hashchange', loadDataFromUrl);
   }, []);
 
   const handleAllCardsRemoved = () => {
@@ -122,57 +128,64 @@ export default function BirthdayCard() {
       className="min-h-screen relative flex items-center justify-center transition-colors duration-500"
       style={{ backgroundColor: activeSkin.colors.bg }}
     >
-      <AnimatePresence mode="wait">
-        {appState === 'editor' ? (
-          <motion.div
-            key="editor"
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
-            className="w-full flex justify-center p-4"
-          >
-            <EditorPanel 
-              frontText={frontText}
-              setFrontText={setFrontText}
-              surpriseText={surpriseText}
-              setSurpriseText={setSurpriseText}
-              cards={cards}
-              setCards={setCards}
-              onPreview={handleGenerateShare}
-              selectedSkinId={selectedSkinId}
-              setSelectedSkinId={setSelectedSkinId}
-              isSubscribed={isSubscribed}
-              unlockedSkins={unlockedSkins}
-              onTriggerPaywall={handleTriggerPaywall}
-            />
-          </motion.div>
-        ) : (
-          <motion.div
-            key="preview"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="w-full h-full"
-          >
-            {isFinished && <Confetti />}
-            <EnvelopePage 
-              isFinished={isFinished}
-              frontText={frontText}
-              surpriseText={surpriseText}
-              onEdit={isShared ? undefined : handleEdit}
-              skin={activeSkin}
+      {isLoading ? (
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-[#D4AF37] border-t-transparent rounded-full animate-spin" />
+          <p className="font-serif italic text-[#D4AF37]">Preparing your surprise...</p>
+        </div>
+      ) : (
+        <AnimatePresence mode="wait">
+          {appState === 'editor' ? (
+            <motion.div
+              key="editor"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              className="w-full flex justify-center p-4"
             >
-              {!isFinished && cards.length > 0 && (
-                <CardSwiper 
-                  cards={cards} 
-                  onAllCardsRemoved={handleAllCardsRemoved}
-                  skin={activeSkin}
-                />
-              )}
-            </EnvelopePage>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              <EditorPanel 
+                frontText={frontText}
+                setFrontText={setFrontText}
+                surpriseText={surpriseText}
+                setSurpriseText={setSurpriseText}
+                cards={cards}
+                setCards={setCards}
+                onPreview={handleGenerateShare}
+                selectedSkinId={selectedSkinId}
+                setSelectedSkinId={setSelectedSkinId}
+                isSubscribed={isSubscribed}
+                unlockedSkins={unlockedSkins}
+                onTriggerPaywall={handleTriggerPaywall}
+              />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="preview"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="w-full h-full"
+            >
+              {isFinished && <Confetti />}
+              <EnvelopePage 
+                isFinished={isFinished}
+                frontText={frontText}
+                surpriseText={surpriseText}
+                onEdit={isShared ? undefined : handleEdit}
+                skin={activeSkin}
+              >
+                {!isFinished && cards.length > 0 && (
+                  <CardSwiper 
+                    cards={cards} 
+                    onAllCardsRemoved={handleAllCardsRemoved}
+                    skin={activeSkin}
+                  />
+                )}
+              </EnvelopePage>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      )}
 
       <ShareModal 
         isOpen={isShareModalOpen}
