@@ -10,14 +10,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    const id = cardStorage.save({
+    const { id, ownerToken } = cardStorage.save({
       frontText,
       surpriseText,
       cards,
       skinId,
     });
 
-    return NextResponse.json({ id });
+    return NextResponse.json({ id, ownerToken });
   } catch (err) {
     console.error('API Save Error:', err);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

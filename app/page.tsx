@@ -67,7 +67,11 @@ export default function BirthdayCard() {
 
       if (!res.ok) throw new Error('Failed to publish');
       
-      const { id } = await res.json();
+      const { id, ownerToken } = await res.json();
+      
+      // Store ownership info locally
+      localStorage.setItem(`card_owner_${id}`, ownerToken);
+      
       const url = `${window.location.origin}/card/${id}`;
       setShareUrl(url);
       setIsShareModalOpen(true);
