@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Birthday Card - Celebrate Special Moments",
+  title: "unfoldr",
   description: "An interactive birthday card with swipeable messages and celebration effects",
 };
 
