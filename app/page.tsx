@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import LZString from 'lz-string';
 import { EnvelopePage } from './components/EnvelopePage';
 import { CardSwiper } from './components/CardSwiper';
 import { Confetti } from './components/Confetti';
@@ -15,10 +16,11 @@ type AppState = 'editor' | 'preview';
 
 export default function BirthdayCard() {
   const [appState, setAppState] = useState<AppState>('editor');
+  const [isLoading, setIsLoading] = useState(true);
   const [isFinished, setIsFinished] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
-  const [isPublishing, setIsPublishing] = useState(false);
+  const [isShared, setIsShared] = useState(false);
   
   // Customization State
   const [frontText, setFrontText] = useState("I love you, Happy Birthday!");
@@ -37,6 +39,57 @@ export default function BirthdayCard() {
 
   const activeSkin = SKINS.find(s => s.id === selectedSkinId) || SKINS[0];
 
+  // URL Hydration logic - Truly Permanent
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const loadDataFromUrl = () => {
+      const getShareData = () => {
+        const href = window.location.href;
+        const match = href.match(/[?&#]c=([^&#]*)/);
+        if (match && match[1]) {
+          return decodeURIComponent(match[1]);
+        }
+        return null;
+      };
+
+      const data = getShareData();
+      
+      if (data) {
+        try {
+          const decompressed = LZString.decompressFromEncodedURIComponent(data) 
+            || LZString.decompress(data);
+
+          if (decompressed) {
+            const parsed = JSON.parse(decompressed);
+            // Apply state updates
+            setTimeout(() => {
+              setFrontText(parsed.f || "Happy Birthday!");
+              setSurpriseText(parsed.s || "You are Loved!");
+              setCards(parsed.c || []);
+              setSelectedSkinId(parsed.sk || 'classic');
+              setIsShared(true);
+              setIsFinished(false);
+              setAppState('preview');
+              setIsLoading(false);
+            }, 50);
+          } else {
+            setIsLoading(false);
+          }
+        } catch (err) {
+          console.error('Error loading shared card:', err);
+          setIsLoading(false);
+        }
+      } else {
+        setIsLoading(false);
+      }
+    };
+
+    loadDataFromUrl();
+    window.addEventListener('hashchange', loadDataFromUrl);
+    return () => window.removeEventListener('hashchange', loadDataFromUrl);
+  }, []);
+
   const handleAllCardsRemoved = () => {
     setIsFinished(true);
   };
@@ -51,36 +104,18 @@ export default function BirthdayCard() {
     setAppState('editor');
   };
 
-  const handleGenerateShare = async () => {
-    setIsPublishing(true);
-    try {
-      const res = await fetch('/api/cards', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          frontText,
-          surpriseText,
-          cards,
-          skinId: selectedSkinId
-        }),
-      });
-
-      if (!res.ok) throw new Error('Failed to publish');
-      
-      const { id, ownerToken } = await res.json();
-      
-      // Store ownership info locally
-      localStorage.setItem(`card_owner_${id}`, ownerToken);
-      
-      const url = `${window.location.origin}/card/${id}`;
-      setShareUrl(url);
-      setIsShareModalOpen(true);
-    } catch (err) {
-      console.error('Publishing failed:', err);
-      alert('Failed to publish your card. Please try again.');
-    } finally {
-      setIsPublishing(false);
-    }
+  const handleGenerateShare = () => {
+    const data = {
+      f: frontText,
+      s: surpriseText,
+      c: cards,
+      sk: selectedSkinId
+    };
+    const serialized = LZString.compressToEncodedURIComponent(JSON.stringify(data));
+    // Data is part of the link = Never Expires
+    const url = `${window.location.origin}${window.location.pathname}#c=${serialized}`;
+    setShareUrl(url);
+    setIsShareModalOpen(true);
   };
 
   const handleTriggerPaywall = (type: 'SKIN' | 'SUBSCRIPTION', skin?: Skin) => {
@@ -102,10 +137,10 @@ export default function BirthdayCard() {
       className="min-h-screen relative flex items-center justify-center transition-colors duration-500"
       style={{ backgroundColor: activeSkin.colors.bg }}
     >
-      {isPublishing ? (
+      {isLoading ? (
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-4 border-[#D4AF37] border-t-transparent rounded-full animate-spin" />
-          <p className="font-serif italic text-[#D4AF37]">Generating your unique card...</p>
+          <p className="font-serif italic text-[#D4AF37]">Opening your surprise...</p>
         </div>
       ) : (
         <AnimatePresence mode="wait">
@@ -145,7 +180,7 @@ export default function BirthdayCard() {
                 isFinished={isFinished}
                 frontText={frontText}
                 surpriseText={surpriseText}
-                onEdit={handleEdit}
+                onEdit={isShared ? undefined : handleEdit}
                 skin={activeSkin}
               >
                 {!isFinished && cards.length > 0 && (
