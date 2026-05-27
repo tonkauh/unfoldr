@@ -3,21 +3,24 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import LZString from 'lz-string';
-import { EnvelopePage } from './components/EnvelopePage';
-import { CardSwiper } from './components/CardSwiper';
-import { Confetti } from './components/Confetti';
+import { WelcomePage, AppMode } from './components/WelcomePage';
+import { TraditionalMode } from './components/TraditionalMode';
+import { OrigamiMode } from './components/OrigamiMode';
+import { BirthdayWishMode } from './components/BirthdayWishMode';
+import { CakeEditor } from './components/CakeEditor';
 import { EditorPanel } from './components/EditorPanel';
 import { ShareModal } from './components/ShareModal';
 import { PaywallModal } from './components/PaywallModal';
 import { CARDS, Card } from './data/cards';
 import { SKINS, Skin } from './data/skins';
+import { CakeConfig } from './data/cake';
 
-type AppState = 'editor' | 'preview';
+type AppState = 'welcome' | 'editor' | 'cake_editor' | 'preview';
 
 export default function BirthdayCard() {
-  const [appState, setAppState] = useState<AppState>('editor');
+  const [appState, setAppState] = useState<AppState>('welcome');
+  const [currentMode, setCurrentMode] = useState<AppMode>('ORIGAMI');
   const [isLoading, setIsLoading] = useState(true);
-  const [isFinished, setIsFinished] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
   const [isShared, setIsShared] = useState(false);
@@ -27,6 +30,12 @@ export default function BirthdayCard() {
   const [surpriseText, setSurpriseText] = useState("You are Loved! ❤️");
   const [cards, setCards] = useState<Card[]>([CARDS[0]]);
   const [selectedSkinId, setSelectedSkinId] = useState('classic');
+  const [cakeConfig, setCakeConfig] = useState<CakeConfig>({
+    flavor: 'vanilla',
+    icingColor: 'pink',
+    topping: 'sprinkles',
+    candleCount: 3,
+  });
 
   // Monetization State
   const [isSubscribed, setIsSubscribed] = useState(false);
@@ -39,7 +48,7 @@ export default function BirthdayCard() {
 
   const activeSkin = SKINS.find(s => s.id === selectedSkinId) || SKINS[0];
 
-  // URL Hydration logic - Truly Permanent
+  // URL Hydration logic
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -62,14 +71,14 @@ export default function BirthdayCard() {
 
           if (decompressed) {
             const parsed = JSON.parse(decompressed);
-            // Apply state updates
             setTimeout(() => {
               setFrontText(parsed.f || "Happy Birthday!");
               setSurpriseText(parsed.s || "You are Loved!");
               setCards(parsed.c || []);
               setSelectedSkinId(parsed.sk || 'classic');
+              setCurrentMode(parsed.m || 'ORIGAMI');
+              if (parsed.ck) setCakeConfig(parsed.ck);
               setIsShared(true);
-              setIsFinished(false);
               setAppState('preview');
               setIsLoading(false);
             }, 50);
@@ -90,18 +99,30 @@ export default function BirthdayCard() {
     return () => window.removeEventListener('hashchange', loadDataFromUrl);
   }, []);
 
-  const handleAllCardsRemoved = () => {
-    setIsFinished(true);
+  const handleSelectMode = (mode: AppMode) => {
+    setCurrentMode(mode);
+    if (mode === 'BIRTHDAY_WISH') {
+      setAppState('cake_editor');
+    } else {
+      setAppState('editor');
+    }
+    // Ensure card count is correct for mode
+    if (mode === 'TRADITIONAL' && cards.length > 1) {
+      setCards([cards[0]]);
+    }
   };
 
   const handlePreview = () => {
-    setIsFinished(false);
     setIsShareModalOpen(false);
     setAppState('preview');
   };
 
   const handleEdit = () => {
-    setAppState('editor');
+    if (currentMode === 'BIRTHDAY_WISH') {
+      setAppState('cake_editor');
+    } else {
+      setAppState('editor');
+    }
   };
 
   const handleGenerateShare = () => {
@@ -109,10 +130,11 @@ export default function BirthdayCard() {
       f: frontText,
       s: surpriseText,
       c: cards,
-      sk: selectedSkinId
+      sk: selectedSkinId,
+      m: currentMode,
+      ck: cakeConfig
     };
     const serialized = LZString.compressToEncodedURIComponent(JSON.stringify(data));
-    // Data is part of the link = Never Expires
     const url = `${window.location.origin}${window.location.pathname}#c=${serialized}`;
     setShareUrl(url);
     setIsShareModalOpen(true);
@@ -134,17 +156,41 @@ export default function BirthdayCard() {
 
   return (
     <main 
-      className="min-h-screen relative flex items-center justify-center transition-colors duration-500"
-      style={{ backgroundColor: activeSkin.colors.bg }}
+      className="min-h-screen relative flex items-center justify-center transition-colors duration-500 overflow-hidden"
+      style={{ backgroundColor: appState === 'welcome' ? '#F9F7F2' : activeSkin.colors.bg }}
     >
       {isLoading ? (
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-4 border-[#D4AF37] border-t-transparent rounded-full animate-spin" />
-          <p className="font-serif italic text-[#D4AF37]">Opening your surprise...</p>
+          <p className="font-serif italic text-[#D4AF37]">Preparing your surprise...</p>
         </div>
       ) : (
         <AnimatePresence mode="wait">
-          {appState === 'editor' ? (
+          {appState === 'welcome' ? (
+            <motion.div
+              key="welcome"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="w-full h-full"
+            >
+              <WelcomePage onSelectMode={handleSelectMode} />
+            </motion.div>
+          ) : appState === 'cake_editor' ? (
+            <motion.div
+              key="cake_editor"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full flex justify-center p-4"
+            >
+              <CakeEditor 
+                config={cakeConfig}
+                setConfig={setCakeConfig}
+                onDone={() => setAppState('editor')}
+              />
+            </motion.div>
+          ) : appState === 'editor' ? (
             <motion.div
               key="editor"
               initial={{ opacity: 0, x: -20 }}
@@ -153,6 +199,7 @@ export default function BirthdayCard() {
               className="w-full flex justify-center p-4"
             >
               <EditorPanel 
+                mode={currentMode}
                 frontText={frontText}
                 setFrontText={setFrontText}
                 surpriseText={surpriseText}
@@ -175,22 +222,32 @@ export default function BirthdayCard() {
               exit={{ opacity: 0 }}
               className="w-full h-full"
             >
-              {isFinished && <Confetti />}
-              <EnvelopePage 
-                isFinished={isFinished}
-                frontText={frontText}
-                surpriseText={surpriseText}
-                onEdit={isShared ? undefined : handleEdit}
-                skin={activeSkin}
-              >
-                {!isFinished && cards.length > 0 && (
-                  <CardSwiper 
-                    cards={cards} 
-                    onAllCardsRemoved={handleAllCardsRemoved}
-                    skin={activeSkin}
-                  />
-                )}
-              </EnvelopePage>
+              {currentMode === 'TRADITIONAL' && (
+                <TraditionalMode 
+                  frontText={frontText}
+                  surpriseText={surpriseText}
+                  cards={cards}
+                  skin={activeSkin}
+                  onEdit={isShared ? undefined : handleEdit}
+                />
+              )}
+              {currentMode === 'ORIGAMI' && (
+                <OrigamiMode 
+                  frontText={frontText}
+                  surpriseText={surpriseText}
+                  cards={cards}
+                  skin={activeSkin}
+                  onEdit={isShared ? undefined : handleEdit}
+                />
+              )}
+              {currentMode === 'BIRTHDAY_WISH' && (
+                <BirthdayWishMode 
+                  cards={cards}
+                  skin={activeSkin}
+                  cakeConfig={cakeConfig}
+                  onEdit={isShared ? undefined : handleEdit}
+                />
+              )}
             </motion.div>
           )}
         </AnimatePresence>

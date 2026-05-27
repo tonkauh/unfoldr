@@ -1,10 +1,12 @@
 'use client';
 
-import { Plus, Trash2, Image as ImageIcon, Check, Lock, Palette } from 'lucide-react';
+import { Plus, Trash2, Image as ImageIcon, Check, Lock, Palette, Info } from 'lucide-react';
 import { Card } from '../data/cards';
 import { SKINS, Skin } from '../data/skins';
+import { AppMode } from './WelcomePage';
 
 interface EditorPanelProps {
+  mode: AppMode;
   frontText: string;
   setFrontText: (text: string) => void;
   surpriseText: string;
@@ -12,7 +14,6 @@ interface EditorPanelProps {
   cards: Card[];
   setCards: (cards: Card[]) => void;
   onPreview: () => void;
-  // Monetization Props
   selectedSkinId: string;
   setSelectedSkinId: (id: string) => void;
   isSubscribed: boolean;
@@ -21,6 +22,7 @@ interface EditorPanelProps {
 }
 
 export function EditorPanel({
+  mode,
   frontText,
   setFrontText,
   surpriseText,
@@ -34,20 +36,19 @@ export function EditorPanel({
   unlockedSkins,
   onTriggerPaywall,
 }: EditorPanelProps) {
-  const MAX_FREE_CARDS = 4;
-  const MAX_PREMIUM_CARDS = 10;
+  const MAX_FREE_CARDS = mode === 'TRADITIONAL' ? 1 : 4;
+  const MAX_PREMIUM_CARDS = mode === 'TRADITIONAL' ? 1 : 10;
   const currentMax = isSubscribed ? MAX_PREMIUM_CARDS : MAX_FREE_CARDS;
 
   const addCard = () => {
     if (cards.length >= currentMax) {
-      if (!isSubscribed) onTriggerPaywall('SUBSCRIPTION');
+      if (!isSubscribed && mode !== 'TRADITIONAL') onTriggerPaywall('SUBSCRIPTION');
       return;
     }
     const newCard: Card = {
       id: Date.now(),
       message: 'New Memory',
-      bgGradient: 'from-pink-100 to-rose-200',
-      emoji: '✨',
+      bgSolid: '#F3F4F6',
     };
     setCards([...cards, newCard]);
   };
@@ -66,7 +67,7 @@ export function EditorPanel({
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setCards(cards.map((c) => (c.id === id ? { ...c, imageUrl: reader.result as string, emoji: '' } : c)));
+        setCards(cards.map((c) => (c.id === id ? { ...c, imageUrl: reader.result as string } : c)));
       };
       reader.readAsDataURL(file);
     }
@@ -83,12 +84,13 @@ export function EditorPanel({
 
   return (
     <div className="w-full max-w-lg bg-[#FFFDFB] shadow-2xl rounded-[2rem] flex flex-col h-[92vh] border border-[#E8E2D9] overflow-hidden text-[#5D554D]">
-      {/* Header */}
       <div className="p-8 border-b border-[#E8E2D9] bg-[#FFFDFB] shrink-0">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-3xl font-serif italic font-bold">Card Creator</h2>
-            <p className="text-[#8A817C] font-serif italic text-sm">Craft your personalized memory</p>
+            <p className="text-[#8A817C] font-serif italic text-sm">
+              {mode.replace('_', ' ')} Experience
+            </p>
           </div>
           <div className="flex -space-x-2">
             {SKINS.slice(0, 3).map((s) => (
@@ -99,15 +101,12 @@ export function EditorPanel({
       </div>
 
       <div className="flex-1 overflow-y-auto p-8 space-y-12 custom-scrollbar">
-        {/* Skin Selector - High Fidelity */}
+        {/* Skin Selector */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-[#A8A29E]">
               <Palette size={14} /> Style & Theme
             </label>
-            <span className="text-[10px] font-bold text-[#D4AF37] uppercase tracking-widest bg-[#FDFBF7] px-2 py-0.5 rounded-full border border-[#D4AF37]/20">
-              {isSubscribed ? 'Pro Unlocked' : 'Free Version'}
-            </span>
           </div>
           
           <div className="grid grid-cols-2 gap-4">
@@ -123,35 +122,17 @@ export function EditorPanel({
                     isSelected ? 'border-[#D4AF37] ring-4 ring-[#D4AF37]/10' : 'border-[#F0EBE7] hover:border-[#D4AF37]/30'
                   }`}
                 >
-                  {/* Visual Preview */}
                   <div className="absolute inset-0 transition-transform group-hover:scale-110 duration-500" style={{ backgroundColor: skin.colors.bg }}>
-                    <div 
-                      className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[70%] h-[70%] shadow-md rounded-sm"
-                      style={{ backgroundColor: skin.colors.paper }}
-                    >
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[70%] h-[70%] shadow-md rounded-sm" style={{ backgroundColor: skin.colors.paper }}>
                       <div className="absolute top-1/2 left-0 right-0 h-1 -translate-y-1/2" style={{ backgroundColor: skin.colors.ribbon }} />
                     </div>
                   </div>
-
-                  {/* Overlay Info */}
                   <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/60 to-transparent text-white">
                     <div className="flex items-center justify-between">
                       <p className="text-[11px] font-bold truncate">{skin.name}</p>
-                      {isLocked ? (
-                        <Lock size={10} fill="currentColor" />
-                      ) : (
-                        skin.type === 'FREE' && <span className="text-[8px] font-black uppercase opacity-70">Free</span>
-                      )}
+                      {isLocked ? <Lock size={10} fill="currentColor" /> : skin.type === 'FREE' && <span className="text-[8px] font-black uppercase opacity-70">Free</span>}
                     </div>
                   </div>
-                  
-                  {isLocked && (
-                    <div className="absolute inset-0 bg-white/10 backdrop-blur-[1px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <div className="bg-white/90 text-black text-[10px] font-bold px-3 py-1 rounded-full shadow-sm">
-                        Unlock {skin.price}
-                      </div>
-                    </div>
-                  )}
                 </button>
               );
             })}
@@ -161,22 +142,24 @@ export function EditorPanel({
         {/* Content Section */}
         <div className="space-y-8">
           <div className="space-y-6 bg-[#FBF9F7] p-6 rounded-3xl border border-[#E8E2D9]/50 shadow-inner">
+            {mode !== 'BIRTHDAY_WISH' && (
+              <div className="space-y-2">
+                <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-[#A8A29E]">Front Text</label>
+                <input
+                  type="text"
+                  value={frontText}
+                  onChange={(e) => setFrontText(e.target.value)}
+                  className="w-full bg-transparent border-b-2 border-[#E8E2D9] focus:border-[#D4AF37] outline-none transition-colors font-serif italic text-xl py-2"
+                />
+              </div>
+            )}
             <div className="space-y-2">
-              <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-[#A8A29E]">Envelope Text</label>
-              <input
-                type="text"
-                value={frontText}
-                onChange={(e) => setFrontText(e.target.value)}
-                placeholder="Front message..."
-                className="w-full bg-transparent border-b-2 border-[#E8E2D9] focus:border-[#D4AF37] outline-none transition-colors font-serif italic text-xl py-2"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-[#A8A29E]">Final Surprise Reveal</label>
+              <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-[#A8A29E]">
+                {mode === 'TRADITIONAL' ? 'Message' : 'Surprise Reveal'}
+              </label>
               <textarea
                 value={surpriseText}
                 onChange={(e) => setSurpriseText(e.target.value)}
-                placeholder="The message at the bottom..."
                 className="w-full bg-transparent border-none focus:ring-0 outline-none transition-colors font-serif italic text-xl resize-none h-20 leading-relaxed"
               />
             </div>
@@ -186,31 +169,24 @@ export function EditorPanel({
           <div className="space-y-6">
             <div className="flex items-center justify-between border-b border-[#F7F3F0] pb-3">
               <div className="space-y-1">
-                <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#A8A29E]">Memory Cards</label>
+                <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#A8A29E]">Memories</label>
                 <p className="text-[10px] text-[#A8A29E] italic">{cards.length} of {currentMax} slots used</p>
               </div>
-              <button
-                onClick={addCard}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all text-[10px] font-bold uppercase tracking-widest shadow-sm ${
-                  cards.length >= currentMax && !isSubscribed
-                  ? 'bg-white border border-[#D4AF37] text-[#D4AF37]' 
-                  : 'bg-[#D4AF37] text-white hover:bg-[#C5A028] hover:shadow-md'
-                }`}
-              >
-                {cards.length >= currentMax && !isSubscribed ? (
-                  <><Lock size={12} /> Get Pro Slots</>
-                ) : (
-                  <><Plus size={12} /> Add Memory</>
-                )}
-              </button>
+              {mode !== 'TRADITIONAL' && (
+                <button
+                  onClick={addCard}
+                  className="flex items-center gap-2 px-4 py-2 bg-[#D4AF37] text-white rounded-full transition-all text-[10px] font-bold uppercase tracking-widest shadow-sm hover:bg-[#C5A028]"
+                >
+                  <Plus size={12} /> Add Memory
+                </button>
+              )}
             </div>
 
             <div className="space-y-6">
               {cards.map((card, idx) => (
                 <div key={card.id} className="relative bg-[#FFFDFB] border border-[#E8E2D9] rounded-[1.5rem] p-5 shadow-sm hover:shadow-md transition-shadow group">
                   <div className="flex items-center gap-6">
-                    {/* Visual Media Slot */}
-                    <div className="relative w-28 h-28 bg-[#FBF9F7] rounded-xl overflow-hidden flex items-center justify-center shadow-inner shrink-0 group-hover:ring-2 ring-[#D4AF37]/30 transition-all">
+                    <div className="relative w-28 h-28 bg-[#FBF9F7] rounded-xl overflow-hidden flex items-center justify-center shadow-inner shrink-0">
                       {card.imageUrl ? (
                         <img src={card.imageUrl} alt="Memory" className="w-full h-full object-cover grayscale-[0.2]" />
                       ) : (
@@ -221,16 +197,14 @@ export function EditorPanel({
                       )}
                       <label className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer flex flex-col items-center justify-center text-white backdrop-blur-[2px]">
                         <ImageIcon size={20} />
-                        <span className="text-[8px] font-bold mt-1 uppercase">Change</span>
                         <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(card.id, e)} />
                       </label>
                     </div>
 
-                    {/* Meta & Message */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-[9px] font-bold text-[#A8A29E] uppercase tracking-widest">Memory {idx + 1}</span>
-                        {cards.length > 1 && (
+                        {cards.length > 1 && mode !== 'TRADITIONAL' && (
                           <button onClick={() => removeCard(card.id)} className="text-[#A8A29E] hover:text-red-400 p-1 transition-colors">
                             <Trash2 size={14} />
                           </button>
@@ -251,13 +225,12 @@ export function EditorPanel({
         </div>
       </div>
 
-      {/* Footer CTA */}
       <div className="p-8 border-t border-[#E8E2D9] bg-[#FFFDFB] shrink-0">
         <button
           onClick={onPreview}
           className="w-full py-5 bg-[#2D2D2D] text-[#FFFDFB] font-serif italic font-bold text-xl rounded-2xl shadow-xl hover:bg-[#1A1A1A] transition-all flex items-center justify-center gap-4 active:scale-[0.98] group"
         >
-          <span>Generate & Share</span>
+          <span>Share This Gift</span>
           <Check size={24} className="group-hover:translate-x-1 transition-transform" />
         </button>
       </div>

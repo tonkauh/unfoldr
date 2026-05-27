@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
 import { Card } from '../data/cards';
-import { Heart } from 'lucide-react';
+import { Heart, Image as ImageIcon } from 'lucide-react';
 import { Skin } from '../data/skins';
 
 interface CardSwiperProps {
@@ -72,11 +72,16 @@ function SwipeableCard({ card, isTop, baseRotation, onSwipeOff, skin }: Swipeabl
         <div className="absolute inset-0 opacity-[0.15] pointer-events-none mix-blend-overlay bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]" />
       )}
 
-      <div className={`w-full aspect-[4/3] bg-gradient-to-br ${card.bgGradient} flex items-center justify-center overflow-hidden shadow-inner relative group rounded-sm`}>
+      <div 
+        className={`w-full aspect-[4/3] flex items-center justify-center overflow-hidden shadow-inner relative group rounded-sm`}
+        style={{ backgroundColor: card.bgSolid }}
+      >
         {card.imageUrl ? (
           <img src={card.imageUrl} alt="Memory" className="w-full h-full object-cover grayscale-[0.1] contrast-[0.9]" />
         ) : (
-          <span className="text-6xl drop-shadow-md">{card.emoji}</span>
+          <span className="text-6xl drop-shadow-md opacity-10">
+            <ImageIcon size={64} />
+          </span>
         )}
         <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
       </div>
