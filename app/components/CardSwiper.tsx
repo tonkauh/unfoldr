@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
 import { Card } from '../data/cards';
 import { Heart, Image as ImageIcon } from 'lucide-react';
@@ -21,6 +21,12 @@ interface SwipeableCardProps {
 }
 
 function SwipeableCard({ card, isTop, baseRotation, onSwipeOff, skin }: SwipeableCardProps) {
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  
+  useEffect(() => {
+    setPrefersReducedMotion(window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  }, []);
+
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-200, 200], [-15, 15]);
   const opacity = useTransform(x, [-200, -150, 0, 150, 200], [0, 1, 1, 1, 0]);
@@ -43,7 +49,7 @@ function SwipeableCard({ card, isTop, baseRotation, onSwipeOff, skin }: Swipeabl
         scale: isTop ? 1 : 0.96,
         opacity: 1,
         y: isTop ? 0 : 3,
-        rotate: isTop ? rotate.get() : baseRotation
+        rotate: prefersReducedMotion ? 0 : isTop ? rotate.get() : baseRotation
       }}
       exit={{ 
         x: x.get() > 0 ? 600 : -600, 
@@ -51,25 +57,33 @@ function SwipeableCard({ card, isTop, baseRotation, onSwipeOff, skin }: Swipeabl
         rotate: x.get() > 0 ? 30 : -30,
         transition: { type: "spring", stiffness: 40, damping: 12 } 
       }}
-      className="absolute inset-0 shadow-2xl p-6 flex flex-col items-center justify-between cursor-grab active:cursor-grabbing border-2"
+      className="absolute inset-0 shadow-2xl p-4 sm:p-6 flex flex-col items-center justify-between cursor-grab active:cursor-grabbing border-2"
       style={{ 
         backgroundColor: skin.colors.paper,
         borderColor: `${skin.colors.accent}40`,
         x,
-        rotate,
+        rotate: prefersReducedMotion ? 0 : rotate,
         opacity,
         zIndex: isTop ? 100 : 10,
         clipPath: 'polygon(2% 1%, 98% 0.5%, 100% 2%, 99.5% 98%, 98% 100%, 2% 99.5%, 0% 98%, 0.5% 2%)'
       }}
     >
+      {/* Texture layers - use CSS fallback instead of external URLs for better performance */}
       {skin.texture === 'handmade-paper' && (
-        <div className="absolute inset-0 opacity-[0.02] pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/handmade-paper.png')]" />
+        <div className="absolute inset-0 opacity-[0.02] pointer-events-none" style={{ 
+          background: 'repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(0,0,0,0.02) 2px, rgba(0,0,0,0.02) 4px)'
+        }} />
       )}
       {skin.texture === 'kraft-paper' && (
-        <div className="absolute inset-0 opacity-[0.08] pointer-events-none mix-blend-multiply bg-[url('https://www.transparenttextures.com/patterns/cardboard.png')]" />
+        <div className="absolute inset-0 opacity-[0.08] pointer-events-none mix-blend-multiply" style={{
+          background: 'repeating-linear-gradient(90deg, transparent, transparent 1px, rgba(0,0,0,0.02) 1px, rgba(0,0,0,0.02) 2px)'
+        }} />
       )}
       {skin.texture === 'noise' && (
-        <div className="absolute inset-0 opacity-[0.15] pointer-events-none mix-blend-overlay bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]" />
+        <div className="absolute inset-0 opacity-[0.15] pointer-events-none mix-blend-overlay" style={{
+          background: 'radial-gradient(circle, rgba(0,0,0,0.02) 1px, transparent 1px)',
+          backgroundSize: '2px 2px'
+        }} />
       )}
 
       <div 
@@ -77,33 +91,39 @@ function SwipeableCard({ card, isTop, baseRotation, onSwipeOff, skin }: Swipeabl
         style={{ backgroundColor: card.bgSolid }}
       >
         {card.imageUrl ? (
-          <img src={card.imageUrl} alt="Memory" className="w-full h-full object-cover grayscale-[0.1] contrast-[0.9]" />
+          <img 
+            src={card.imageUrl} 
+            alt="Memory" 
+            className="w-full h-full object-cover grayscale-[0.1] contrast-[0.9]"
+            loading="lazy"
+            decoding="async"
+          />
         ) : (
-          <span className="text-6xl drop-shadow-md opacity-10">
-            <ImageIcon size={64} />
+          <span className="text-4xl sm:text-6xl drop-shadow-md opacity-10">
+            <ImageIcon size={48} />
           </span>
         )}
         <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
       </div>
 
-      <div className="flex-1 flex items-center justify-center text-center px-4 py-6">
+      <div className="flex-1 flex items-center justify-center text-center px-2 sm:px-4 py-3 sm:py-6">
         <p 
-          className="text-2xl font-serif italic leading-relaxed tracking-tight"
+          className="text-lg sm:text-2xl font-serif italic leading-relaxed tracking-tight"
           style={{ color: skin.colors.text }}
         >
           {card.message}
         </p>
       </div>
 
-      <div className="w-full flex justify-between items-center opacity-40 border-t border-black/5 pt-4">
-        <Heart size={20} style={{ color: skin.colors.accent }} />
+      <div className="w-full flex justify-between items-center opacity-40 border-t border-black/5 pt-2 sm:pt-4">
+        <Heart size={16} className="sm:size-[20px]" style={{ color: skin.colors.accent }} />
         <span 
-          className="text-[10px] font-serif uppercase tracking-[0.2em]"
+          className="text-[8px] sm:text-[10px] font-serif uppercase tracking-[0.2em]"
           style={{ color: skin.colors.accent }}
         >
           Memory No. {card.id.toString().slice(-4)}
         </span>
-        <Heart size={20} style={{ color: skin.colors.accent }} />
+        <Heart size={16} className="sm:size-[20px]" style={{ color: skin.colors.accent }} />
       </div>
     </motion.div>
   );
@@ -122,8 +142,8 @@ export function CardSwiper({ cards, onAllCardsRemoved, skin }: CardSwiperProps) 
   };
 
   return (
-    <div className="w-full h-full flex items-center justify-center select-none p-8">
-      <div className="relative w-full h-[85%]">
+    <div className="w-full h-full flex items-center justify-center select-none p-4 sm:p-8">
+      <div className="relative w-full h-[85%] max-h-[600px]">
         <AnimatePresence mode="popLayout">
           {cards.slice(currentIndex, currentIndex + 2).reverse().map((card, index, array) => {
             const isTop = index === array.length - 1;

@@ -12,12 +12,20 @@ export function Confetti() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // Check for reduced motion preference
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) return;
+
     const resize = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
     };
     resize();
     window.addEventListener('resize', resize);
+
+    // Adaptive particle count based on device
+    const isMobile = window.innerWidth < 768;
+    const particleCount = isMobile ? 30 : 80;
 
     const confetti: Array<{
       x: number;
@@ -33,8 +41,8 @@ export function Confetti() {
 
     const colors = ['#F9A8D4', '#D4AF37', '#FFFDFB', '#E8E2D9', '#C5A028'];
 
-    // Create initial burst
-    for (let i = 0; i < 150; i++) {
+    // Create initial burst with adaptive count
+    for (let i = 0; i < particleCount; i++) {
       confetti.push({
         x: canvas.width / 2,
         y: canvas.height / 2,
@@ -49,36 +57,41 @@ export function Confetti() {
     }
 
     let animationId: number;
+    let frameCount = 0;
     const animate = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      confetti.forEach((particle, index) => {
-        particle.y += particle.vy;
-        particle.x += particle.vx;
-        particle.vy += 0.15; // Lighter gravity for realistic fall
-        particle.vx *= 0.98; // Slightly more air resistance
-        particle.rotation += particle.rotationSpeed;
+      // Use frame skipping on mobile for better performance
+      const skipFrames = isMobile ? 1 : 0;
+      if (frameCount % (skipFrames + 1) === 0) {
+        confetti.forEach((particle, index) => {
+          particle.y += particle.vy;
+          particle.x += particle.vx;
+          particle.vy += 0.15;
+          particle.vx *= 0.98;
+          particle.rotation += particle.rotationSpeed;
 
-        ctx.save();
-        ctx.fillStyle = particle.color;
-        ctx.translate(particle.x, particle.y);
-        ctx.rotate(particle.rotation);
-        
-        if (particle.shape === 'square') {
-          ctx.fillRect(-particle.size / 2, -particle.size / 2, particle.size, particle.size);
-        } else {
-          ctx.beginPath();
-          ctx.arc(0, 0, particle.size / 2, 0, Math.PI * 2);
-          ctx.fill();
-        }
-        ctx.restore();
+          ctx.save();
+          ctx.fillStyle = particle.color;
+          ctx.translate(particle.x, particle.y);
+          ctx.rotate(particle.rotation);
+          
+          if (particle.shape === 'square') {
+            ctx.fillRect(-particle.size / 2, -particle.size / 2, particle.size, particle.size);
+          } else {
+            ctx.beginPath();
+            ctx.arc(0, 0, particle.size / 2, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.restore();
 
-        // Remove particles off screen
-        if (particle.y > canvas.height + 100) {
-          confetti.splice(index, 1);
-        }
-      });
+          if (particle.y > canvas.height + 100) {
+            confetti.splice(index, 1);
+          }
+        });
+      }
 
+      frameCount++;
       if (confetti.length > 0) {
         animationId = requestAnimationFrame(animate);
       }

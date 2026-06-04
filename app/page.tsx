@@ -11,6 +11,9 @@ import { CakeEditor } from './components/CakeEditor';
 import { EditorPanel } from './components/EditorPanel';
 import { ShareModal } from './components/ShareModal';
 import { PaywallModal } from './components/PaywallModal';
+import { Toast, useToast } from './components/Toast';
+import { useKeyboardShortcuts } from './components/KeyboardShortcuts';
+import { useDraftStorage } from './hooks/useDraftStorage';
 import { CARDS, Card } from './data/cards';
 import { SKINS, Skin } from './data/skins';
 import { CakeConfig } from './data/cake';
@@ -18,6 +21,9 @@ import { CakeConfig } from './data/cake';
 type AppState = 'welcome' | 'editor' | 'cake_editor' | 'preview';
 
 export default function BirthdayCard() {
+  const { toasts, addToast, removeToast } = useToast();
+  const { saveDraft, loadDraft, clearDraft, setIsDirty } = useDraftStorage();
+
   const [appState, setAppState] = useState<AppState>('welcome');
   const [currentMode, setCurrentMode] = useState<AppMode>('ORIGAMI');
   const [isLoading, setIsLoading] = useState(true);
@@ -28,6 +34,7 @@ export default function BirthdayCard() {
   // Customization State
   const [frontText, setFrontText] = useState("I love you, Happy Birthday!");
   const [surpriseText, setSurpriseText] = useState("You are Loved! ❤️");
+  const [frontTextColor, setFrontTextColor] = useState("#2D2D2D");
   const [cards, setCards] = useState<Card[]>([CARDS[0]]);
   const [selectedSkinId, setSelectedSkinId] = useState('classic');
   const [cakeConfig, setCakeConfig] = useState<CakeConfig>({
@@ -48,7 +55,44 @@ export default function BirthdayCard() {
 
   const activeSkin = SKINS.find(s => s.id === selectedSkinId) || SKINS[0];
 
-  // URL Hydration logic
+  // Keyboard shortcuts
+  useKeyboardShortcuts({
+    onSave: () => {
+      const draftData = {
+        frontText,
+        surpriseText,
+        cards,
+        selectedSkinId,
+        currentMode,
+        cakeConfig,
+        timestamp: Date.now(),
+      };
+      saveDraft(draftData);
+      addToast('✨ Draft saved successfully!', 'success', 2000);
+    },
+  });
+
+  // Auto-save draft every 30 seconds when editing
+  useEffect(() => {
+    if (appState !== 'editor' && appState !== 'cake_editor') return;
+
+    const interval = setInterval(() => {
+      const draftData = {
+        frontText,
+        surpriseText,
+        cards,
+        selectedSkinId,
+        currentMode,
+        cakeConfig,
+        timestamp: Date.now(),
+      };
+      saveDraft(draftData);
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [frontText, surpriseText, cards, selectedSkinId, currentMode, cakeConfig, appState, saveDraft]);
+
+  // URL Hydration logic with draft loading
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -81,6 +125,7 @@ export default function BirthdayCard() {
               setIsShared(true);
               setAppState('preview');
               setIsLoading(false);
+              clearDraft();
             }, 50);
           } else {
             setIsLoading(false);
@@ -90,14 +135,30 @@ export default function BirthdayCard() {
           setIsLoading(false);
         }
       } else {
-        setIsLoading(false);
+        // Try loading draft
+        const draft = loadDraft();
+        if (draft && Date.now() - draft.timestamp < 7 * 24 * 60 * 60 * 1000) { // 7 days
+          setTimeout(() => {
+            setFrontText(draft.frontText);
+            setSurpriseText(draft.surpriseText);
+            setCards(draft.cards);
+            setSelectedSkinId(draft.selectedSkinId);
+            setCurrentMode(draft.currentMode);
+            setCakeConfig(draft.cakeConfig);
+    addToast('🎉 Share link generated!', 'success', 2000);
+            addToast('📝 Draft restored from last session', 'info', 3000);
+            setIsLoading(false);
+          }, 100);
+        } else {
+          setIsLoading(false);
+        }
       }
     };
 
     loadDataFromUrl();
     window.addEventListener('hashchange', loadDataFromUrl);
     return () => window.removeEventListener('hashchange', loadDataFromUrl);
-  }, []);
+  }, [loadDraft, clearDraft, addToast]);
 
   const handleSelectMode = (mode: AppMode) => {
     setCurrentMode(mode);
@@ -202,6 +263,8 @@ export default function BirthdayCard() {
                 mode={currentMode}
                 frontText={frontText}
                 setFrontText={setFrontText}
+                frontTextColor={frontTextColor}
+                setFrontTextColor={setFrontTextColor}
                 surpriseText={surpriseText}
                 setSurpriseText={setSurpriseText}
                 cards={cards}
@@ -212,6 +275,7 @@ export default function BirthdayCard() {
                 isSubscribed={isSubscribed}
                 unlockedSkins={unlockedSkins}
                 onTriggerPaywall={handleTriggerPaywall}
+                onToast={addToast}
               />
             </motion.div>
           ) : (
@@ -255,9 +319,7 @@ export default function BirthdayCard() {
 
       <ShareModal 
         isOpen={isShareModalOpen}
-        onClose={() => setIsShareModalOpen(false)}
-        shareUrl={shareUrl}
-        onPreview={handlePreview}
+        onToast={addToast}
       />
 
       <PaywallModal 
@@ -265,6 +327,11 @@ export default function BirthdayCard() {
         onClose={() => setPaywallConfig(prev => ({ ...prev, isOpen: false }))}
         type={paywallConfig.type}
         itemName={paywallConfig.skin?.name}
+        price={paywallConfig.skin?.price}
+        onUnlock={handleUnlock}
+      />
+
+      <Toast toasts={toasts} removeToast={removeToast}   itemName={paywallConfig.skin?.name}
         price={paywallConfig.skin?.price}
         onUnlock={handleUnlock}
       />
